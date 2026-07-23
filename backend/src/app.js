@@ -38,7 +38,6 @@ app.use((_req, res) => {
 });
 
 // ── Global error handler (expanded in Task 1.2) ───────────────────────────────
-// eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   logger.error({ err }, 'Unhandled error');
   const status = err.status || 500;

@@ -1,0 +1,28 @@
+{
+  "name": "cloudcast-backend",
+  "version": "1.0.0",
+  "description": "CloudCast AI weather agent — Express API server",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "lint": "eslint src/ server.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --runInBand"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.19.2",
+    "pino": "9.3.2",
+    "pino-http": "10.3.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "pino-pretty": "^13.1.3"
+  }
+}

@@ -37,6 +37,10 @@ const {
   searchLocation,
 } = await import('../../src/services/weatherApiClient.js')
 
+// Import cache so we can clear it between tests — prevents stale cached
+// responses from a success test leaking into error-case tests.
+const { weatherCache } = await import('../../src/utils/cache.js')
+
 import {
   rawCurrent,
   rawForecast,
@@ -119,6 +123,7 @@ async function runErrorCases(fn, args) {
 
 beforeEach(() => {
   mockFetch.mockReset()
+  weatherCache.clear() // prevent cached success responses bleeding into error-case tests
 })
 
 // ── getCurrent ────────────────────────────────────────────────────────────────

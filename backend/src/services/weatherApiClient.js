@@ -18,6 +18,7 @@
 
 import { AppError } from '../middleware/errorHandler.js'
 import { env } from '../config/env.js'
+import { weatherCache } from '../utils/cache.js'
 
 const BASE_URL = 'https://api.weatherapi.com/v1'
 
@@ -74,11 +75,22 @@ async function mapError(response, rawError) {
 }
 
 /**
- * Perform a fetch with a timeout and consistent error mapping.
+ * Perform a fetch with a timeout, caching, and consistent error mapping.
  * @param {string} endpoint  Path after BASE_URL (e.g. '/current.json')
  * @param {Record<string, string>} params  Query string params (excluding key)
  */
 async function request(endpoint, params) {
+  // ── Cache key: stable regardless of param insertion order ────────────────
+  const sortedParams = Object.entries(params)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&')
+  const cacheKey = `${endpoint}?${sortedParams}`
+
+  const cached = weatherCache.get(cacheKey)
+  if (cached !== undefined) return cached
+
+  // ── Build URL (API key injected here, NOT in the cache key) ──────────────
   const url = new URL(`${BASE_URL}${endpoint}`)
   url.searchParams.set('key', env.WEATHER_API_KEY)
   for (const [k, v] of Object.entries(params)) {
@@ -96,7 +108,9 @@ async function request(endpoint, params) {
       throw await mapError(response, null)
     }
 
-    return await response.json()
+    const data = await response.json()
+    weatherCache.set(cacheKey, data) // cache on successful response only
+    return data
   } catch (err) {
     clearTimeout(timer)
     // Re-throw AppErrors we already created (e.g. from mapError above)

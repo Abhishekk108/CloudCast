@@ -6,7 +6,6 @@ import { logger } from './utils/logger.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import healthRouter from './routes/health.routes.js'
 import chatRouter from './routes/chat.routes.js'
-
 const app = express()
 
 // ── Request logging ──────────────────────────────────────────────────────────
@@ -27,6 +26,13 @@ app.use(
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/health', healthRouter)
 app.use('/api/chat', chatRouter)
+
+// Dev-only routes — never registered in production
+if (env.NODE_ENV !== 'production') {
+  const { default: devRouter } = await import('./routes/dev.routes.js')
+  app.use('/api/dev', devRouter)
+  logger.info('Dev routes mounted at /api/dev (not available in production)')
+}
 
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => {

@@ -1,9 +1,13 @@
-import 'dotenv/config';
-import app from './src/app.js';
-import { logger } from './src/utils/logger.js';
+/**
+ * Entry point — load and validate env vars before anything else imports them.
+ * dotenv must populate process.env before env.js runs its Zod parse.
+ */
 
-const PORT = process.env.PORT || 5000;
+import 'dotenv/config'
+import { env } from './src/config/env.js'
+import app from './src/app.js'
+import { logger } from './src/utils/logger.js'
 
-app.listen(PORT, () => {
-  logger.info(`Server listening on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
-});
+app.listen(env.PORT, () => {
+  logger.info(`Server listening on port ${env.PORT} [${env.NODE_ENV}]`)
+})

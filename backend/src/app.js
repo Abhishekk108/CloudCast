@@ -4,6 +4,8 @@ import pinoHttp from 'pino-http'
 import { env } from './config/env.js'
 import { logger } from './utils/logger.js'
 import { errorHandler } from './middleware/errorHandler.js'
+import healthRouter from './routes/health.routes.js'
+import chatRouter from './routes/chat.routes.js'
 
 const app = express()
 
@@ -23,13 +25,8 @@ app.use(
 )
 
 // ── Routes ───────────────────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() })
-})
-
-// Placeholder — real routes wired in Phase 1+
-// import chatRoutes from './routes/chat.routes.js';
-// app.use('/api/chat', chatRoutes);
+app.use('/api/health', healthRouter)
+app.use('/api/chat', chatRouter)
 
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => {

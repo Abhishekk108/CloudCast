@@ -19,6 +19,36 @@ import { TOOL_SCHEMAS } from '../agent/toolSchemas.js'
 import { executeTool } from '../tools/index.js'
 import { logger } from '../utils/logger.js'
 
+// ── Friendly degradation messages (Task 6.3) ─────────────────────────────────
+// When an external provider is down, return a chat-style reply rather than
+// surfacing a raw 500 to the client. Each message is warm and actionable.
+
+const DEGRADATION_REPLIES = {
+  GROQ_TIMEOUT:
+    "I'm having trouble connecting to my AI service right now. Please wait a moment and try again.",
+  GROQ_RATE_LIMIT:
+    "I'm handling a lot of requests right now and hit a rate limit. Please try again in a few seconds.",
+  GROQ_AUTH_ERROR:
+    "There's a configuration issue on my end — I can't reach the AI service right now. Please try again later.",
+  GROQ_UNKNOWN:
+    "My AI service returned an unexpected error. Please try again in a moment.",
+  WEATHER_API_TIMEOUT:
+    "I couldn't fetch live weather data right now — the weather service is taking too long to respond. Please try again shortly.",
+  WEATHER_API_AUTH_ERROR:
+    "There's a configuration issue with the weather data service. Please try again later.",
+  WEATHER_API_UNKNOWN:
+    "I couldn't fetch live weather data right now — the weather service returned an unexpected error. Please try again shortly.",
+}
+
+/**
+ * Map a caught AppError to a user-friendly degradation reply if it's a
+ * known provider outage code. Returns null for unknown/client errors.
+ * @param {import('../middleware/errorHandler.js').AppError} err
+ */
+function getDegradationReply(err) {
+  return DEGRADATION_REPLIES[err?.code] ?? null
+}
+
 // ── Task 4.1 / 4.3 — Non-streaming handler ───────────────────────────────────
 
 export const handleChat = async (req, res, next) => {
@@ -49,6 +79,21 @@ export const handleChat = async (req, res, next) => {
       usage: result.usage,
     })
   } catch (err) {
+    // Task 6.3 — provider outages return a friendly chat reply, not a 500
+    const degradationReply = getDegradationReply(err)
+    if (degradationReply) {
+      logger.warn(
+        { err, conversationId: convId, code: err.code, latencyMs: Date.now() - start },
+        'Provider outage — returning graceful degradation reply'
+      )
+      return res.json({
+        reply: degradationReply,
+        toolCalls: [],
+        conversationId: convId,
+        usage: null,
+        degraded: true,
+      })
+    }
     next(err)
   }
 }
@@ -215,9 +260,15 @@ export const handleChatStream = async (req, res, next) => {
     res.end()
   } catch (err) {
     logger.error({ err, conversationId: convId }, 'Stream error')
-    // Try to send an error event if headers haven't fully closed yet
+    // Task 6.3 — provider outages emit a friendly error event, not a crash
+    const degradationReply = getDegradationReply(err)
     try {
-      send({ type: 'error', code: err.code ?? 'INTERNAL_ERROR', message: err.message ?? 'Unexpected error' })
+      send({
+        type: 'error',
+        code: err.code ?? 'INTERNAL_ERROR',
+        message: degradationReply ?? err.message ?? 'Unexpected error',
+        degraded: !!degradationReply,
+      })
       res.end()
     } catch {
       next(err)

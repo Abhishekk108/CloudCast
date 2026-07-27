@@ -18,6 +18,7 @@ import { chatCompletion } from '../services/groqClient.js'
 import { TOOL_SCHEMAS } from '../agent/toolSchemas.js'
 import { executeTool } from '../tools/index.js'
 import { logger } from '../utils/logger.js'
+import { env } from '../config/env.js'
 
 // ── Friendly degradation messages (Task 6.3) ─────────────────────────────────
 // When an external provider is down, return a chat-style reply rather than
@@ -143,6 +144,9 @@ export const handleChatStream = async (req, res, next) => {
     let keepLooping = true
     let iterationCount = 0
     const MAX = 5 // mirrors agent.js MAX_TOOL_ITERATIONS
+    // Track the final assistant message content if Groq already produced it
+    // without needing a streaming re-call (i.e. it came back as stop in Phase 1).
+    let phaseOneReply = null
 
     while (keepLooping && iterationCount < MAX) {
       iterationCount++
@@ -158,9 +162,12 @@ export const handleChatStream = async (req, res, next) => {
       const reason = choice?.finish_reason
 
       if (reason === 'stop' || !assistantMsg?.tool_calls?.length) {
-        // No more tool calls — push the final assistant message and break out
-        // so we can stream it below
-        conversation.push(assistantMsg)
+        // Groq returned a final text answer — capture it.
+        // Do NOT push this back into conversation — Phase 2 will stream
+        // a fresh generation from the same conversation state (without the
+        // already-generated assistant message), so the conversation must end
+        // with the last tool result message (role: 'tool') or user message.
+        phaseOneReply = assistantMsg?.content ?? null
         keepLooping = false
         break
       }
@@ -174,6 +181,8 @@ export const handleChatStream = async (req, res, next) => {
           let args = {}
           try { args = JSON.parse(tc.function.arguments) } catch { /* ignore */ }
 
+          logger.info({ tool: toolName, args }, 'Stream tool call executing')
+
           // Emit tool event so the frontend can show a "thinking…" indicator
           send({ type: 'tool', tool: toolName, args })
 
@@ -181,11 +190,13 @@ export const handleChatStream = async (req, res, next) => {
           let errorMsg = null
           try {
             result = await executeTool(toolName, args)
+            logger.info({ tool: toolName, result }, 'Stream tool call result')
           } catch (err) {
             errorMsg = err?.message ?? 'Tool failed'
+            logger.warn({ tool: toolName, args, error: errorMsg }, 'Stream tool call failed')
           }
 
-          toolCallTrace.push({ tool: toolName, args, result, ...(errorMsg && { error: errorMsg }) })
+          toolCallTrace.push({ tool: toolName, args, result: result ?? null, ...(errorMsg && { error: errorMsg }) })
           conversation.push({
             role: 'tool',
             tool_call_id: tc.id,
@@ -196,16 +207,46 @@ export const handleChatStream = async (req, res, next) => {
     }
 
     // ── Phase 2: stream the final answer ─────────────────────────────────────
-    // Remove the last assistant message that was appended (it may have content:null
-    // from a tool-call turn). The streaming call re-generates it.
-    // Actually the conversation already contains everything up to the last non-tool
-    // response — just call with stream:true.
+    // The conversation now ends with the last `tool` role message (or the
+    // original user message if no tools were called). We call Groq with
+    // stream:true so it generates the final answer token-by-token.
+    //
+    // IMPORTANT: Never push a non-streaming assistant message into the
+    // conversation before the streaming call — that produces an invalid
+    // message sequence (ending with role:assistant) that Groq rejects with
+    // a 400. The streaming call generates the assistant turn fresh.
 
+    // If Phase 1 already produced a text reply without any tool calls
+    // (i.e. it came back as stop on the very first iteration), we already
+    // have the content — stream it locally as synthetic token events to
+    // avoid a redundant round-trip that would fail anyway.
+    if (phaseOneReply !== null && toolCallTrace.length === 0) {
+      // No tools were called: emit the reply as tokens word-by-word
+      const words = phaseOneReply.match(/\S+\s*/g) ?? [phaseOneReply]
+      for (const word of words) {
+        send({ type: 'token', token: word })
+      }
+      logger.info(
+        {
+          conversationId: convId,
+          toolsCalled: [],
+          latencyMs: Date.now() - start,
+          replyLength: phaseOneReply.length,
+        },
+        'Stream chat turn completed'
+      )
+      send({ type: 'done', conversationId: convId, toolCalls: toolCallTrace })
+      res.end()
+      return
+    }
+
+    // Tool calls were made — conversation ends with role:tool messages.
+    // Make a fresh streaming call so Groq generates the final answer.
     const streamResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${req.app.locals.groqApiKey ?? process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
         model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',

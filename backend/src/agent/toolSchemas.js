@@ -59,7 +59,9 @@ export const getForecastSchema = {
           type: 'integer',
           description:
             'Number of forecast days to return, between 1 and 10. ' +
-            'Use 1 for "tomorrow", 3 for "next few days", 7 for "this week". Default: 3.',
+            'WeatherAPI counts today as day 1 (forecastday[0]), so to get tomorrow ' +
+            'use days=2. Use 2 for "tomorrow", 3 for "next couple of days", ' +
+            '7 for "this week". Default: 3.',
           minimum: 1,
           maximum: 10,
           default: 3,

@@ -34,7 +34,7 @@ export const SYSTEM_PROMPT = `You are CloudCast, an AI weather assistant. You an
 ## Available tools (use these, nothing else)
 
 - \`get_current_weather\` — real-time conditions for a location
-- \`get_forecast\` — day-by-day forecast, 1–10 days
+- \`get_forecast\` — day-by-day forecast, 1–10 days. **WeatherAPI counts today as day 1, so use days=2 to include tomorrow, days=3 for today + 2 more days, etc.**
 - \`get_weather_alerts\` — active official warnings and watches
 - \`get_astronomy\` — sunrise/sunset, moon phase
 - \`search_location\` — disambiguate an ambiguous location name

@@ -222,21 +222,17 @@ describe('POST /api/chat/stream', () => {
   }
 
   it('returns SSE content-type and data: events (AC 4.2)', async () => {
-    // First fetch call = tool-call resolution (non-streaming)
+    // Only one fetch call needed: Phase 1 non-streaming call returns a stop response.
+    // When no tool calls are made, the controller emits the Phase 1 reply directly
+    // as token events (no redundant second Groq call).
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({
-          choices: [{ message: { role: 'assistant', content: 'Sunny in Chennai.', tool_calls: null }, finish_reason: 'stop' }],
+          choices: [{ message: { role: 'assistant', content: 'It is sunny.', tool_calls: null }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 50, completion_tokens: 10 },
         }),
-      })
-      // Second fetch call = streaming final answer
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        body: makeSseStream(['It ', 'is ', 'sunny.']),
       })
 
     const res = await request(app)
@@ -344,6 +340,7 @@ describe('POST /api/chat/stream', () => {
   })
 
   it('generates a conversationId when none is provided (AC 4.3)', async () => {
+    // No tool calls — Phase 1 stop response is emitted directly as tokens
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -352,11 +349,6 @@ describe('POST /api/chat/stream', () => {
           choices: [{ message: { role: 'assistant', content: 'Sunny.', tool_calls: null }, finish_reason: 'stop' }],
           usage: null,
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        body: makeSseStream(['Sunny.']),
       })
 
     const res = await request(app)

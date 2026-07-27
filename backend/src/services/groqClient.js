@@ -74,11 +74,12 @@ async function mapError(response, rawError) {
     )
   }
 
+  // Called with a synthetic response where .json() returns the already-parsed body
   let body = {}
   try {
     body = await response.json()
   } catch {
-    // ignore — fall through
+    // ignore
   }
 
   const providerMsg = body?.error?.message ?? response.statusText
@@ -127,6 +128,19 @@ export async function chatCompletion({
     ...(tools?.length && { tools, tool_choice: tool_choice ?? 'auto' }),
   }
 
+  // Log every outgoing request so the conversation structure is always auditable.
+  // Log at debug level normally; the caller (agent.js) logs at info level for turns.
+  logger.debug(
+    {
+      model: body.model,
+      messageCount: messages.length,
+      messageRoles: messages.map((m) => m.role),
+      hasTools: !!(tools?.length),
+      toolNames: tools?.map((t) => t.function?.name),
+    },
+    'Groq request'
+  )
+
   let lastError = null
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -146,7 +160,28 @@ export async function chatCompletion({
       clearTimeout(timer)
 
       if (!response.ok) {
-        const appErr = await mapError(response, null)
+        // Read and log the raw body BEFORE mapError consumes the stream,
+        // so the actual Groq error is always visible in logs.
+        let rawBody = null
+        try {
+          rawBody = await response.json()
+        } catch {
+          // ignore parse failure
+        }
+        logger.error(
+          { status: response.status, body: rawBody, attempt, model: body.model },
+          'Groq non-200 response'
+        )
+
+        const appErr = rawBody?.error?.message
+          ? new AppError(
+              response.status === 401 || response.status === 403 ? 'GROQ_AUTH_ERROR'
+                : response.status === 429 ? 'GROQ_RATE_LIMIT'
+                : 'GROQ_UNKNOWN',
+              `Groq API error ${response.status}: ${rawBody.error.message}`,
+              response.status === 429 ? 429 : 502
+            )
+          : await mapError({ ...response, json: async () => rawBody ?? {} }, null)
 
         // Auth errors (401/403) are never retried — fail fast
         if ([401, 403].includes(response.status)) throw appErr
@@ -165,7 +200,20 @@ export async function chatCompletion({
         throw appErr
       }
 
-      return await response.json()
+      const responseBody = await response.json()
+      logger.debug(
+        {
+          model: responseBody.model ?? body.model,
+          finish_reason: responseBody.choices?.[0]?.finish_reason,
+          tool_calls: responseBody.choices?.[0]?.message?.tool_calls?.map((tc) => ({
+            name: tc.function?.name,
+            args: tc.function?.arguments,
+          })),
+          usage: responseBody.usage,
+        },
+        'Groq response received'
+      )
+      return responseBody
     } catch (err) {
       clearTimeout(timer)
 

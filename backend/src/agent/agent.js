@@ -94,7 +94,7 @@ async function runToolCalls(toolCalls) {
 
       try {
         result = await executeTool(name, args)
-        logger.debug({ tool: name, args }, 'Tool call succeeded')
+        logger.info({ tool: name, args, result }, 'Tool call succeeded')
       } catch (err) {
         errorMsg = err?.message ?? 'Tool execution failed'
         logger.warn({ tool: name, args, error: errorMsg }, 'Tool call failed')
@@ -146,7 +146,14 @@ export async function runAgent({ messages, model, temperature, maxTokens }) {
   let iteration = 0
 
   for (; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-    logger.debug({ iteration, messageCount: conversation.length }, 'Agent loop iteration')
+    logger.info(
+      {
+        iteration,
+        messageCount: conversation.length,
+        messageRoles: conversation.map((m) => m.role),
+      },
+      'Agent loop iteration'
+    )
 
     // ── Call Groq ────────────────────────────────────────────────────────────
     const completion = await chatCompletion({

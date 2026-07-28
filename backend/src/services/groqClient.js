@@ -121,7 +121,7 @@ export async function chatCompletion({
   max_tokens = 1024,
 }) {
   const body = {
-    model: model ?? process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
+    model: model ?? process.env.GROQ_MODEL ?? 'openai/gpt-oss-120b',
     messages,
     temperature,
     max_tokens,

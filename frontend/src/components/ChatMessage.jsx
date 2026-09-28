@@ -64,21 +64,22 @@ export function ChatMessage({ message, index }) {
             {isUser ? (
               <p className="whitespace-pre-wrap break-words">{message.content}</p>
             ) : (
-              <ReactMarkdown
-                className="prose prose-invert prose-sm max-w-none"
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
-                  em: ({ children }) => <em className="text-sky-300">{children}</em>,
-                  code: ({ children }) => (
-                    <code className="rounded bg-white/10 px-1.5 py-0.5 text-sm font-mono text-sky-300">
-                      {children}
-                    </code>
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
+              <div className="prose prose-invert prose-sm max-w-none">
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                    strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                    em: ({ children }) => <em className="text-sky-300">{children}</em>,
+                    code: ({ children }) => (
+                      <code className="rounded bg-white/10 px-1.5 py-0.5 text-sm font-mono text-sky-300">
+                        {children}
+                      </code>
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
             )}
 
             {/* Copy button (assistant only) */}

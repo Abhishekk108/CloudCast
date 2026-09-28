@@ -1,1 +1,41 @@
 @import "tailwindcss";
+
+/* ── Full-height layout ───────────────────────────────────────────────────── */
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Custom scrollbar (dark theme) ────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Mobile safe-area padding ──────────────────────────────────────────────── */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Prose dark overrides (react-markdown in dark bubbles) ─────────────────── */
+.prose-invert p      { color: rgba(255,255,255,0.85); }
+.prose-invert strong { color: #fff; }
+.prose-invert ul     { color: rgba(255,255,255,0.75); }
+.prose-invert ol     { color: rgba(255,255,255,0.75); }
+.prose-invert li     { margin-top: 0.15em; margin-bottom: 0.15em; }
+.prose-invert h1,
+.prose-invert h2,
+.prose-invert h3     { color: #fff; margin-top: 0.75em; margin-bottom: 0.25em; }
+.prose-invert a      { color: #69AFFF; }
+.prose-invert code   { background: rgba(255,255,255,0.1); color: #93c5fd; }
+.prose-invert pre    { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }

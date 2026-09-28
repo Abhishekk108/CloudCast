@@ -61,7 +61,7 @@ export function ChatWindow({ messages, isLoading, onSuggestion }) {
       {messages.length === 0 && !isLoading ? (
         <EmptyState onSuggestion={onSuggestion} />
       ) : (
-        <div className="mx-auto max-w-2xl space-y-4">
+        <div className="mx-auto w-full space-y-4">
           {messages.map((msg) => (
             <div key={msg.id}>
               <MessageBubble message={msg} />
